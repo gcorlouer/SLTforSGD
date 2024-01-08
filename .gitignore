@@ -1,0 +1,8 @@
+# Ignore subfolders
+*.dat
+deprecated/
+figures/
+data/
+**checkpoint**
+*.pyc
+*.dat
