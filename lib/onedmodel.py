@@ -244,7 +244,8 @@ class SGDPolyRunner:
             for batch_size in batch_range:
                 self.update_params(batch_size=int(batch_size))
                 for lr in lr_range:
-                    print(f"Running experiment {iexp} over {nexp}")
+                    if iexp % 10 == 0:
+                        print(f"Running experiment {iexp} over {nexp}")
                     self.update_params(lr=lr)
                     df = self.generate_trajectories(model)
                     trajectories = np.asarray(df['trajectory'].to_list())
