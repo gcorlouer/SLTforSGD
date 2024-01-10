@@ -238,7 +238,8 @@ class SGDPolyRunner:
         """
         iexp = 0
         nexp = len(w0_range) * len(batch_range) * len(lr_range)
-        df_escape = {"escape_rate": [], "lr/B": [], "w0": [], "pvalue": [], "intercept": [], "fraction": []}
+        escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], 
+                     "pvalue": [], "intercept": [], "fraction": [], 'regression':[]}
         for w0 in w0_range:
             model.update_params(w0=w0)
             for batch_size in batch_range:
@@ -253,17 +254,23 @@ class SGDPolyRunner:
                     fraction = regular_fraction(clean_traj, model)
                     stats = compute_escape_rate(fraction, frac_max=frac_max)
                     escape_rate = stats.slope
+                    time = np.arange(0,len(fraction))
+                    regression = escape_rate * time + stats.intercept
                     pvalue = stats.pvalue
-                    df_escape["escape_rate"].append(escape_rate)
-                    df_escape["lr/B"].append(lr/batch_size)
-                    df_escape["w0"].append(w0)
-                    df_escape["pvalue"].append(pvalue)
-                    df_escape["intercept"].append(stats.intercept)
-                    df_escape["fraction"].append(fraction)
+                    escape_dict["escape_rate"].append(escape_rate)
+                    escape_dict["lr"].append(lr)
+                    escape_dict["B"].append(batch_size)
+                    escape_dict["w0"].append(w0)
+                    escape_dict["pvalue"].append(pvalue)
+                    escape_dict["intercept"].append(stats.intercept)
+                    escape_dict["fraction"].append(fraction)
+                    escape_dict["regression"].append(regression)
+                    plot_regression(fraction, regression, frac_max=frac_max,
+                                    batch_size=batch_size, lr=lr, w0=w0)
                     iexp +=1
-        df = pd.DataFrame.from_dict(df_escape)
+        df = pd.DataFrame.from_dict(escape_dict)
         fname = f"escape_rate_to_{frac_max}_trajectories_nSGD_{self.nSGD}_nsamples_{self.nsamples}.csv"
-        fpath = Path("../data/")
+        fpath = Path("../data/regressions")
         fpath = fpath.joinpath(fname)
         df.to_csv(fpath)
         return df
@@ -277,6 +284,26 @@ def theoretical_loss(model: PolyModel, w, x,y):
     y_pred = model.forward(x)
     return loss_function(y_pred, y).item()
 
+    
+def plot_regression(fraction, regression, frac_max=10**-2, 
+                    batch_size=20, lr=0.01, w0=1.5):
+    tmax = np.argmax(fraction<frac_max)
+    if tmax == 0:
+        tmax = len(fraction)
+    log_frac = np.log(fraction)
+    time = np.arange(0,len(fraction))
+    plt.figure()
+    plt.plot(time, regression, label = 'regression', color='purple')
+    plt.scatter(time, log_frac, label='fraction', marker='x', color='orange')
+    plt.xlim((0,tmax))
+    plt.xlabel("time")
+    plt.ylabel("fractions")
+    plt.legend()
+    plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}")
+    fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0}.png"
+    fpath = Path("../data/")
+    fpath = fpath.joinpath(fname)
+    plt.savefig(fpath)
 
 def regular_fraction(trajectories: np.array, model: PolyModel) -> np.array:
     # Comput local maximum
