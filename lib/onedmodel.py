@@ -231,15 +231,15 @@ class SGDPolyRunner:
         return df
 
 
-    def parameter_sweep(self, w0_range, batch_range, lr_range, 
-                        model: PolyModel, frac_max=10**-2):
+    def parameter_sweep(self, w0_range, batch_range, lr_range,
+                        model: PolyModel, tmin=3, frac_max=10**-2):
         """
         Run multiple experiments with varying parameters and compute escape rate for each params
         """
         iexp = 0
         nexp = len(w0_range) * len(batch_range) * len(lr_range)
         escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], 
-                     "pvalue": [], "fraction": []}
+                     "pvalue": [], "fraction": []   }
         for w0 in w0_range:
             model.update_params(w0=w0)
             for batch_size in batch_range:
@@ -252,7 +252,7 @@ class SGDPolyRunner:
                     trajectories = np.asarray(df['trajectory'].to_list())
                     clean_traj = trajectories[~np.isnan(trajectories).any(axis=1)]
                     fraction = regular_fraction(clean_traj, model)
-                    stats = compute_escape_rate(fraction, frac_max=frac_max, tmin=5,
+                    stats = compute_escape_rate(fraction, frac_max=frac_max, tmin=tmin,
                                                 batch_size=batch_size, lr=lr, w0=w0)
                     escape_rate = np.abs(stats.slope)
                     pvalue = stats.pvalue
@@ -278,32 +278,7 @@ def theoretical_loss(model: PolyModel, w, x,y):
     model.update_params(weight=torch.nn.Parameter(torch.tensor(w)))
     y_pred = model.forward(x)
     return loss_function(y_pred, y).item()
-
-    
-def regression_line(fraction, stats, frac_max=10**-2, tmin=5,
-                    batch_size=20, lr=0.01, w0=1.5):
-    """
-    tmin is the number of outlier that we drop for the regression
-    """
-    tmax = np.argmax(fraction<frac_max)
-    if tmax == 0:
-        tmax = len(fraction)
-    log_frac = np.log(fraction[:tmax])
-    time = np.arange(tmin,tmax)
-    regression = stats.slope * time + stats.intercept # drop first points because they are outliers
-    plt.figure()
-    plt.plot(time, regression, label = 'regression', color='purple')
-    plt.scatter(time, log_frac, label='fraction', marker='x', color='orange')
-    plt.xlabel("time")
-    plt.ylabel("fractions")
-    plt.legend()
-    plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}")
-    fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0}.png"
-    fpath = Path("../data/")
-    fpath = fpath.joinpath(fname)
-    plt.savefig(fpath)
-    return regression
-
+ 
 def regular_fraction(trajectories: np.array, model: PolyModel) -> np.array:
     # Comput local maximum
     wbarrier = (model.w0*model.d1 - model.w0*model.d2)/(model.d1 + model.d2)
@@ -333,20 +308,24 @@ def read_clean_trajectories(fpath: Path):
     return clean_traj
 
 
-def compute_escape_rate(fraction, tmin=5, frac_max = 10**-3, 
+def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3, 
                         batch_size=20, lr=0.01, w0=1.5):
     tmax = np.argmax(fraction<frac_max)
     if tmax == 0:
         tmax = len(fraction)
-    time = np.arange(tmin, tmax,1)
-    log_frac = np.log(fraction[tmin:tmax]) # Drop outliers for the regression
-    stats = linregress(time, log_frac)
-    regression = stats.slope * time + stats.intercept 
+    time = np.arange(0, len(fraction))
+    regress_time = np.arange(tmin, tmax,1)
+    regress_log_frac = np.log(fraction[tmin:tmax]) # Drop outliers for the regression
+    #log_frac = np.log(fraction)
+    stats = linregress(regress_time, regress_log_frac)
+    regression = stats.slope * time + stats.intercept
+    regression = np.exp(regression) 
     plt.figure()
+    plt.scatter(time, fraction, label='fraction', marker='x', color='orange')
     plt.plot(time, regression, label = 'regression', color='purple')
-    plt.scatter(time, log_frac, label='fraction', marker='x', color='orange')
     plt.xlabel("time")
     plt.ylabel("fractions")
+    plt.yscale("log")
     plt.legend()
     plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}")
     fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0}.png"
