@@ -241,7 +241,7 @@ class SGDPolyRunner:
         """
         iexp = 0
         nexp = len(w0_range) * len(batch_range) * len(lr_range)
-        escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], "fraction": []   }
+        escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], "fraction": [], "error": []}
         for w0 in w0_range:
             model.update_params(w0=w0)
             for batch_size in batch_range:
@@ -254,15 +254,13 @@ class SGDPolyRunner:
                     trajectories = np.asarray(df['trajectory'].to_list())
                     clean_traj = trajectories[~np.isnan(trajectories).any(axis=1)]
                     fraction = regular_fraction(clean_traj, model)
-                    escape_rate = compute_escape_rate(fraction, frac_max=frac_max, tmin=tmin,
+                    escape_rate, error = compute_escape_rate(fraction, frac_max=frac_max, tmin=tmin,
                                                 batch_size=batch_size, lr=lr, w0=w0)
-                    #escape_rate = np.abs(stats.slope)
-                    #pvalue = stats.pvalue
                     escape_dict["escape_rate"].append(escape_rate)
                     escape_dict["lr"].append(lr)
                     escape_dict["B"].append(batch_size)
                     escape_dict["w0"].append(w0)
-                    #escape_dict["pvalue"].append(pvalue)
+                    escape_dict["error"].append(error)
                     escape_dict["fraction"].append(fraction)
                     iexp +=1
         df = pd.DataFrame.from_dict(escape_dict)
@@ -323,6 +321,7 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     X_with_const = sm.add_constant(regress_time)
     model = sm.OLS(regress_log_frac, X_with_const).fit()
     escape_rate = np.abs(model.params[1])
+    error = model.bse[1]
     predictions = model.get_prediction(X_with_const)
     predictions_summary = predictions.summary_frame(alpha=0.05)  # 95% confidence interval
     plt.figure()
@@ -340,7 +339,7 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     fpath = Path("../data/")
     fpath = fpath.joinpath(fname)
     plt.savefig(fpath)
-    return escape_rate
+    return escape_rate, error
 
 def plot_potential(model: PolyModel, nsamp = 10**4):
     wbarrier = (model.w0*model.d1 - model.w0*model.d2)/(model.d1 + model.d2)
