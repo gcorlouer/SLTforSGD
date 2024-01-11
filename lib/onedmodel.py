@@ -6,6 +6,7 @@ import torch.optim as optim
 import pandas as pd
 import copy 
 import ast
+import statsmodels.api as sm
 
 from pandas import DataFrame
 from torch import Tensor
@@ -14,6 +15,8 @@ from typing import Optional
 from torch.utils.data import DataLoader, TensorDataset
 from pathlib import Path
 from scipy.stats import linregress
+from scipy.stats import t
+
 
 
 # Models
@@ -238,8 +241,7 @@ class SGDPolyRunner:
         """
         iexp = 0
         nexp = len(w0_range) * len(batch_range) * len(lr_range)
-        escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], 
-                     "pvalue": [], "fraction": []   }
+        escape_dict = {"escape_rate": [], "lr": [],'B':[], "w0": [], "fraction": []   }
         for w0 in w0_range:
             model.update_params(w0=w0)
             for batch_size in batch_range:
@@ -252,15 +254,15 @@ class SGDPolyRunner:
                     trajectories = np.asarray(df['trajectory'].to_list())
                     clean_traj = trajectories[~np.isnan(trajectories).any(axis=1)]
                     fraction = regular_fraction(clean_traj, model)
-                    stats = compute_escape_rate(fraction, frac_max=frac_max, tmin=tmin,
+                    escape_rate = compute_escape_rate(fraction, frac_max=frac_max, tmin=tmin,
                                                 batch_size=batch_size, lr=lr, w0=w0)
-                    escape_rate = np.abs(stats.slope)
-                    pvalue = stats.pvalue
+                    #escape_rate = np.abs(stats.slope)
+                    #pvalue = stats.pvalue
                     escape_dict["escape_rate"].append(escape_rate)
                     escape_dict["lr"].append(lr)
                     escape_dict["B"].append(batch_size)
                     escape_dict["w0"].append(w0)
-                    escape_dict["pvalue"].append(pvalue)
+                    #escape_dict["pvalue"].append(pvalue)
                     escape_dict["fraction"].append(fraction)
                     iexp +=1
         df = pd.DataFrame.from_dict(escape_dict)
@@ -315,24 +317,30 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
         tmax = len(fraction)
     time = np.arange(0, len(fraction))
     regress_time = np.arange(tmin, tmax,1)
+    log_frac = np.log(fraction)
     regress_log_frac = np.log(fraction[tmin:tmax]) # Drop outliers for the regression
-    #log_frac = np.log(fraction)
-    stats = linregress(regress_time, regress_log_frac)
-    regression = stats.slope * time + stats.intercept
-    regression = np.exp(regression) 
+    #stats = linregress(regress_time, regress_log_frac)
+    X_with_const = sm.add_constant(regress_time)
+    model = sm.OLS(regress_log_frac, X_with_const).fit()
+    escape_rate = np.abs(model.params[1])
+    predictions = model.get_prediction(X_with_const)
+    predictions_summary = predictions.summary_frame(alpha=0.05)  # 95% confidence interval
     plt.figure()
     plt.scatter(time, fraction, label='fraction', marker='x', color='orange')
-    plt.plot(time, regression, label = 'regression', color='purple')
+    plt.plot(regress_time, np.exp(predictions_summary['mean']), label = 'regression', color='purple')
+    plt.fill_between(regress_time, np.exp(predictions_summary['obs_ci_lower']), np.exp(predictions_summary['obs_ci_upper']),
+                      alpha=0.5, label='95% CI for Slope')
     plt.xlabel("time")
     plt.ylabel("fractions")
     plt.yscale("log")
+    plt.ylim((10**-4, 1))
     plt.legend()
-    plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}")
+    plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}, escape rate is {escape_rate}")
     fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0}.png"
     fpath = Path("../data/")
     fpath = fpath.joinpath(fname)
     plt.savefig(fpath)
-    return stats
+    return escape_rate
 
 def plot_potential(model: PolyModel, nsamp = 10**4):
     wbarrier = (model.w0*model.d1 - model.w0*model.d2)/(model.d1 + model.d2)
