@@ -334,8 +334,8 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     plt.yscale("log")
     plt.ylim((10**-4, 1))
     plt.legend()
-    plt.title(f"Escape of trajectories, B {batch_size}, lr, {lr}, w0, {w0}, escape rate is {escape_rate}")
-    fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0}.png"
+    plt.title(f"Fraction of trajectories, B {batch_size}, lr, {lr}, w0, {w0:.2e}, escape rate is {escape_rate:.2e}")
+    fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0:.2e}.png"
     fpath = Path("../data/")
     fpath = fpath.joinpath(fname)
     plt.savefig(fpath)
