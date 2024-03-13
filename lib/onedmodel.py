@@ -73,7 +73,6 @@ class PolyModel(torch.nn.Module):
         w1 = (self.weight + self.w0)**self.d1
         w2 = (self.weight - self.w0)**self.d2
         return input * w1 * w2
-    
 
     def gradient(self):
         w1 = (self.weight + self.w0)**self.d1
@@ -81,6 +80,41 @@ class PolyModel(torch.nn.Module):
         w2 = (self.weight - self.w0)**self.d2
         dw2 = self.d2 * (self.weight - self.w0)**(self.d2 - 1) 
         return dw1 * w2 + w1 * dw2
+    
+class PolyModel2D(torch.nn.Module):
+    def __init__(self, wmin=-4, wmax=4, d:int=1, in_features:int=1, out_features:int=1, seed:int=1, w_init:Optional[Tensor]=None) -> None:
+        super(PolyModel2D, self).__init__()
+        self.d = d
+        self.wmin = wmin  # boundary of initialization
+        self.wmax = wmax
+        self.seed = seed  # Seed for initialisation of trajectories
+        self.w_init = w_init
+        self.in_features = in_features
+        self.out_features = out_features
+        
+        # Define the weight parameters
+        self.weight1 = torch.nn.Parameter(torch.empty((out_features, in_features)))
+        self.weight2 = torch.nn.Parameter(torch.empty((out_features, in_features)))
+        
+        if self.w_init is not None:
+            self.weight1 = torch.nn.Parameter(w_init)
+            self.weight2 = torch.nn.Parameter(w_init)
+        else:
+            torch.nn.init.uniform_(self.weight1, self.wmin, self.wmax)
+            torch.nn.init.uniform_(self.weight2, self.wmin, self.wmax)
+    
+    def update_params(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+    
+    def forward(self, input:Tensor):
+        w1 = self.weight1
+        w2 = self.weight2
+        
+        Q = (w1**2 + w2**2)**2 * w1**self.d
+        
+        return input * Q
 
 #%% SGD old code    
 class SGD:
@@ -341,7 +375,7 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     plt.savefig(fpath)
     return escape_rate, error
 
-def plot_potential(model: PolyModel, nsamp = 10**4):
+def plot_potential(model: PolyModel, nsamp = 10**4, ymax=500):
     wbarrier = (model.w0*model.d1 - model.w0*model.d2)/(model.d1 + model.d2)
     a = float(model.w0)
     x = torch.randn((nsamp, 1, 1))
@@ -364,6 +398,7 @@ def plot_potential(model: PolyModel, nsamp = 10**4):
     plt.axvline(x=wbarrier, linestyle='--' ,color="k", label="barrier")
     plt.scatter([-a, a], [min1, min2], color='blue', s=100, zorder=5, marker='x',label='Minima')
     plt.legend()
+    plt.ylim((0, ymax))
     plt.title("Potential")
     plt.show()
 
