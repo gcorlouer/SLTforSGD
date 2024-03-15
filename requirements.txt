@@ -1,0 +1,11 @@
+torch
+numpy
+# pymc
+seaborn
+pandas
+statsmodels
+scipy
+ipykernel
+jupyter
+matplotlib
+tqdm

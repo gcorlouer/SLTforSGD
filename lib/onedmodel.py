@@ -82,26 +82,30 @@ class PolyModel(torch.nn.Module):
         return dw1 * w2 + w1 * dw2
     
 class PolyModel2D(torch.nn.Module):
-    def __init__(self, wmin=-4, wmax=4, d:int=1, in_features:int=1, out_features:int=1, seed:int=1, w_init:Optional[Tensor]=None) -> None:
+    def __init__(self, wxm=4, wym=4, d:int=2, in_features:int=1, out_features:int=1, seed:int=1, 
+                 wx_init:Optional[Tensor]=None, wy_init:Optional[Tensor]=None) -> None:
         super(PolyModel2D, self).__init__()
         self.d = d
-        self.wmin = wmin  # boundary of initialization
-        self.wmax = wmax
+        self.wxmin = -wxm  # boundary of initialization
+        self.wxmax = wxm  # boundary of initialization
+        self.wymin = -wym
+        self.wymax = wym
         self.seed = seed  # Seed for initialisation of trajectories
-        self.w_init = w_init
+        self.wx_init = wx_init
+        self.wy_init = wy_init
         self.in_features = in_features
         self.out_features = out_features
         
         # Define the weight parameters
         self.weight1 = torch.nn.Parameter(torch.empty((out_features, in_features)))
         self.weight2 = torch.nn.Parameter(torch.empty((out_features, in_features)))
-        
-        if self.w_init is not None:
-            self.weight1 = torch.nn.Parameter(w_init)
-            self.weight2 = torch.nn.Parameter(w_init)
+        self.weight = torch.stack([self.weight1, self.weight2])
+        if self.wx_init is not None:
+            self.weight1 = torch.nn.Parameter(wx_init)
+            self.weight2 = torch.nn.Parameter(wy_init)
         else:
-            torch.nn.init.uniform_(self.weight1, self.wmin, self.wmax)
-            torch.nn.init.uniform_(self.weight2, self.wmin, self.wmax)
+            torch.nn.init.uniform_(self.weight1, self.wxmin, self.wxmax)
+            torch.nn.init.uniform_(self.weight2, self.wymin, self.wymax)
     
     def update_params(self, **kwargs):
         for key, value in kwargs.items():
@@ -238,6 +242,42 @@ class SGDPolyRunner:
         return running_loss, running_weight
     
 
+    def train2d(self, model: PolyModel2D, dataset: DataLoader) -> tuple:
+        """
+        Train with pytorch automatic differentiation to compute gradient
+        """
+        # Loss and weights tracking
+        running_loss = []
+        if model.wx_init == None:
+            running_weight1 = []
+            running_weight2 = []
+        else:
+            w1_init_copy = model.weight1.clone().detach()
+            w2_init_copy = model.weight2.clone().detach() 
+            running_weight1 = [w1_init_copy.item()]
+            running_weight2 = [w2_init_copy.item()]
+        model.double()
+        # Loss and Optimizer
+        loss_function = nn.MSELoss()
+        if self.auto == True:
+            optimizer = optim.SGD(model.parameters(), momentum=self.momentum, lr=self.lr)
+        # Training the Model
+        for xb, yb in dataset:
+            xb = xb.double()
+            yb = yb.double()
+            # Forward pass
+            if self.auto==True:
+                y_pred = model.forward(xb)
+                loss = loss_function(y_pred, yb)
+                running_loss.append(loss.item())
+                # Backward pass and optimization
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            running_weight1.append(model.weight1.item())
+            running_weight2.append(model.weight2.item())
+        return running_loss, running_weight1, running_weight2    
+
     def generate_trajectories(self,  model: PolyModel) -> DataFrame:
         # Set up seed for reproducibility
         np.random.seed(seed=self.seed)
@@ -262,6 +302,40 @@ class SGDPolyRunner:
         model_params = f"w0_{model.w0}_d1_{model.d1}_d2_{model.d2}_seed_{model.seed}.csv"
         sgd_params = f"lr_{self.lr}_b_{self.batch_size}_seed_{self.seed}_N_{self.nSGD}_m_{self.nsamples}"
         fname = "sgd_traj"
+        fname = "_".join([fname, sgd_params, model_params])
+        fpath = fpath.joinpath(fname)
+        df.to_csv(fpath)
+        return df
+
+    def generate_trajectories2d(self,  model: PolyModel2D) -> DataFrame:
+        # Set up seed for reproducibility
+        np.random.seed(seed=self.seed)
+        data = {'w1_init': [], 'w2_init': [], 'trajectory1': [], 'trajectory2': [], 'loss': []}
+        dataset = self.make_dataset(model)
+        wx_inits = np.random.uniform(model.wxmin, model.wxmax, size=(model.out_features, model.in_features, self.nSGD))
+        wy_inits = np.random.uniform(model.wymin, model.wymax, size=(model.out_features, model.in_features, self.nSGD))
+
+        for i in range(self.nSGD):
+            if i + 1 % 1000 == 0:
+                print(f"trajectory {i} over {self.nSGD}")
+            wxi = torch.tensor(wx_inits[:,:,i])
+            wyi = torch.tensor(wy_inits[:,:,i])
+            model.update_params(wx_init=wxi, wy_init=wyi)
+            model.update_params(weight1=torch.nn.Parameter(model.wx_init), weight2=torch.nn.Parameter(model.wy_init)) #re-initialise before training
+            running_loss, running_weight1, running_weight2 = self.train2d(model, dataset)
+            data['w1_init'].append(model.weight1.item())
+            data['w2_init'].append(model.weight2.item())
+            data['trajectory1'].append(running_weight1)
+            data['trajectory2'].append(running_weight2)
+            data['loss'].append(running_loss)
+        df = pd.DataFrame(data)
+        fpath = Path("../data/")
+        # Check if the folder exists
+        if not fpath.exists() or not fpath.is_dir():
+            raise FileNotFoundError(f"The folder '{fpath}' does not exist.")
+        model_params = f"d_{model.d}_seed_{model.seed}.csv"
+        sgd_params = f"lr_{self.lr}_b_{self.batch_size}_seed_{self.seed}_N_{self.nSGD}_m_{self.nsamples}"
+        fname = "sgd_traj_2D"
         fname = "_".join([fname, sgd_params, model_params])
         fpath = fpath.joinpath(fname)
         df.to_csv(fpath)
@@ -303,6 +377,51 @@ class SGDPolyRunner:
         fpath = fpath.joinpath(fname)
         df.to_csv(fpath)
         return df
+    
+import torch
+
+def compute_likelihood(model: PolyModel, x, y):
+    y_pred = model(x)
+    mse_loss = torch.nn.MSELoss()(y_pred, y)
+    return torch.exp(-mse_loss)
+
+def prior_prob(model):
+    # Define your prior probability distribution for the model parameters
+    # For example, you can use a uniform prior within the specified bounds
+    if model.wmin <= model.weight <= model.wmax:
+        return 1.0
+    else:
+        return 0.0
+
+def metropolis_hastings(model, x, y, num_samples=1000, step_size=0.1):
+    samples = []
+    current_weight = model.weight.clone()
+
+    for _ in range(num_samples):
+        # Propose a new weight
+        proposed_weight = current_weight + torch.randn_like(current_weight) * step_size
+
+        # Create a new model with the proposed weight
+        proposed_model = PolyModel(w_init=proposed_weight)
+
+        # Compute the likelihood and prior probabilities
+        current_likelihood = compute_likelihood(model, x, y)
+        proposed_likelihood = compute_likelihood(proposed_model, x, y)
+        current_prior = prior_prob(model)
+        proposed_prior = prior_prob(proposed_model)
+
+        # Compute the acceptance probability
+        acceptance_prob = min(1, (proposed_likelihood * proposed_prior) / (current_likelihood * current_prior))
+
+        # Accept or reject the proposed weight
+        if torch.rand(1) < acceptance_prob:
+            current_weight = proposed_weight
+            model.weight.data = proposed_weight
+
+        samples.append(current_weight.clone())
+
+    return samples
+
 
 def theoretical_loss(model: PolyModel, w, x,y):
     """
@@ -312,6 +431,7 @@ def theoretical_loss(model: PolyModel, w, x,y):
     model.update_params(weight=torch.nn.Parameter(torch.tensor(w)))
     y_pred = model.forward(x)
     return loss_function(y_pred, y).item()
+
  
 def regular_fraction(trajectories: np.array, model: PolyModel) -> np.array:
     # Comput local maximum
