@@ -533,3 +533,36 @@ def plot_fraction_traj(trajectories, model: PolyModel, sgd_runner:SGDPolyRunner,
     plt.title("Fraction of trajectories in the low degenerate phase \n" 
               f"b: {sgd_runner.batch_size}, lr:{sgd_runner.lr}, N:{sgd_runner.nSGD}, m: {sgd_runner.nsamples}")
     plt.ylim((0.001,1))
+
+
+def plot_contour_2d(loss, df, wym, wx, wy):
+    trajx = df["trajectory1"][0]
+    trajy = df["trajectory2"][0]
+    fig, ax = plt.subplots()
+    plt.contourf(wx, wy, loss, levels=20, cmap='viridis')
+    plt.colorbar(label='Theoretical Loss')
+    plt.plot(trajx,trajy, linestyle= '--', color='purple', label='trajectory')
+    plt.xlabel(r"$w_1$")
+    plt.ylabel(r"$w_2$")
+    plt.xlim((-1, 1))
+    plt.ylim((-wym, wym))
+    plt.grid(True)
+    plt.scatter(0,0,marker='x', label="Degenerate point")
+    plt.scatter(wx[0], wy[0], marker='x', label="start", color='blue')
+    plt.axvline(x=0, linestyle='--',label = "Degenerate line", color='k')
+    plt.legend()
+    plt.show()
+
+def theoretical_loss2d(model, nsamples, wxm, wym):
+    num_points = 1000
+    x = torch.randn((nsamples, 1, 1))
+    y = torch.randn((nsamples, 1, 1))
+    wx_values = np.linspace(-wxm, wxm, num_points)
+    wy_values = np.linspace(-wym, wym, num_points)
+    wx, wy = np.meshgrid(wx_values, wy_values)
+    w = np.stack((wx, wy), axis=-1)
+
+    loss = np.zeros((num_points, num_points))
+    for i in range(num_points):
+        for j in range(num_points):
+            loss[i, j] = theoretical_loss(model, w[i, j], x, y)
