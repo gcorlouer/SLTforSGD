@@ -252,8 +252,8 @@ class SGDPolyRunner:
             running_weight1 = []
             running_weight2 = []
         else:
-            w1_init_copy = model.weight1.clone().detach()
-            w2_init_copy = model.weight2.clone().detach() 
+            w1_init_copy = model.weight1.clone()
+            w2_init_copy = model.weight2.clone() 
             running_weight1 = [w1_init_copy.item()]
             running_weight2 = [w2_init_copy.item()]
         model.double()
@@ -486,9 +486,9 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     plt.xlabel("time")
     plt.ylabel("fractions")
     plt.yscale("log")
-    plt.ylim((10**-4, 1))
+    plt.ylim((10**-3, 1))
     plt.legend()
-    plt.title(f"Fraction of trajectories, B {batch_size}, lr, {lr}, w0, {w0:.2e}, escape rate is {escape_rate:.2e}")
+    plt.title(f"Fraction of trajectories, B ={batch_size}, lr={lr}, w0={w0:.2f}, escape rate is {escape_rate:.2e}")
     fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0:.2e}.png"
     fpath = Path("../data/")
     fpath = fpath.joinpath(fname)
@@ -511,8 +511,8 @@ def plot_potential(model: PolyModel, nsamp = 10**4, ymax=500):
     regular = wrange < wbarrier
     singular = wrange >= wbarrier
 
-    plt.plot(wrange[regular], loss[regular], color="purple", label="high RLCT")
-    plt.plot(wrange[singular], loss[singular], color="orange", label="low RLCT")
+    plt.plot(wrange[regular], loss[regular], color="purple", label="Sharp")
+    plt.plot(wrange[singular], loss[singular], color="orange", label="Broad")
     plt.xlabel("Weight")
     plt.ylabel("Potential")
     plt.axvline(x=wbarrier, linestyle='--' ,color="k", label="barrier")
