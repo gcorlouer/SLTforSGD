@@ -4,6 +4,7 @@ import sympy as sym
 from sympy.vector import CoordSys3D
 from sympy.utilities.lambdify import lambdastr, implemented_function, lambdify
 import numpy as np
+import matplotlib.pyplot as plt
 
 def get_coeffs(q, print_func=False):
     """
@@ -67,8 +68,8 @@ def run(q, nw, lr, v, ve, w0, b, L, dt, steps, w_left, w_right, zero_prob_left=F
         """
         Return 0 if w < left or w > right, return a constant value otherwise
         """
-        k = 1./(2.*(right-left))
-        return np.where(w < left, -k, k) + np.where(w > right, -k, k)
+        k = 1./(right-left)
+        return np.where((w >= left) & (w <= right), k, 0)
     
     P.setValue(creneau(w, w_left, w_right))
 
@@ -102,3 +103,18 @@ def run(q, nw, lr, v, ve, w0, b, L, dt, steps, w_left, w_right, zero_prob_left=F
         Ps.append(P.copy())
 
     return mesh.x, Ps
+
+def plot_potential(q, wm, npts=500):
+    w = sym.symbols('w')
+    l = sym.lambdify(w, q**2, 'numpy')
+    w_values = np.linspace(-wm, wm, npts)  # Adjust range as needed
+    l_val = l(w_values)
+    # Create a plot of the potential
+    plt.figure(figsize=(8, 4))
+    plt.plot(w_values, l_val)
+    plt.xlabel('$w$')
+    plt.ylabel('$l(w)$')
+    plt.title('Plot of the potential $l$')
+    plt.show()
+
+
