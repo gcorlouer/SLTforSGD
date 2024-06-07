@@ -18,7 +18,6 @@ from scipy.stats import linregress
 from scipy.stats import t
 
 
-
 # Models
 class TrivialModel(torch.nn.Module):
     """
@@ -377,8 +376,6 @@ class SGDPolyRunner:
         fpath = fpath.joinpath(fname)
         df.to_csv(fpath)
         return df
-    
-import torch
 
 def compute_likelihood(model: PolyModel, x, y):
     y_pred = model(x)
