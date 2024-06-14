@@ -1,10 +1,20 @@
-# Code for SGD on singular 1D and 2D models
+# SGD on degenerate 1D and 2D loss-landscape
 
-Run SGD on 1D and 2D models that are linear in the data and polynomial in their parameters. 
+This project contains python code to to study the influence of degenerate directions in the loss landscape on SGD dynamics.
+SGD is ran on 1D and 2D models that are linear in their inputs and polynomial in their parameters. 
 
-Main classes and functions are in the library (lib) especially see onedmodel.py for the model, SGD runner and utility functions.
+The main classes and functions are in the in the SGD_utils.py file in the library lib/ directory 
 
-Experiments are ran in the notebooks especially see sgd1d.ipynb and sgd_slt_2d.ipynb. For Fokker plank see FK_finite_volume
+## Codebase structure
+
+Folders
+* `lib/` folder contains `SGD_utils.py` the main library of the project to run SGD on degenerate models
+* `notebooks/` contains notebook showing SGD escaping non degenerate minima and getting stuck on degenerate minima
+
+## Usage
+
+Install dependencies with `requirement.txt` and run experiments in notebooks.
+
 
 
 
