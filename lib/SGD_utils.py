@@ -475,17 +475,23 @@ def compute_escape_rate(fraction, tmin=3, frac_max = 10**-3,
     error = model.bse[1]
     predictions = model.get_prediction(X_with_const)
     predictions_summary = predictions.summary_frame(alpha=0.05)  # 95% confidence interval
+    title_lines = [
+    f"Fraction of trajectories in the non-degenerate minimum",
+    fr"$B={batch_size}$, $\eta={lr}$, $w_0={w0:.2f}$",
+    #f"Escape rate is {escape_rate:.2e}"
+]   
+    title = "\n".join(title_lines)
     plt.figure()
     plt.scatter(time, fraction, label='fraction', marker='x', color='orange')
     plt.plot(regress_time, np.exp(predictions_summary['mean']), label = 'regression', color='purple')
     plt.fill_between(regress_time, np.exp(predictions_summary['obs_ci_lower']), np.exp(predictions_summary['obs_ci_upper']),
-                      alpha=0.5, label='95% CI for Slope')
-    plt.xlabel("time")
-    plt.ylabel("fractions")
+                      alpha=0.5, label='95% CI')
+    plt.xlabel("Time")
+    plt.ylabel("Fraction")
     plt.yscale("log")
     plt.ylim((10**-3, 1))
     plt.legend()
-    plt.title(f"Fraction of trajectories, B ={batch_size}, lr={lr}, w0={w0:.2f}, escape rate is {escape_rate:.2e}")
+    plt.title(title)
     fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0:.2e}.png"
     fpath = Path("../data/")
     fpath = fpath.joinpath(fname)
