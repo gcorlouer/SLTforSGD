@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch import Tensor
 from typing import Optional
 from lib.config.model_config import PolyModel1DConfig, PolyModel2DConfig, BaseModelConfig
+# TODO: Test models classes and methods
+# TODO: Fix weights tensor vs float
 
 class TrivialModel(nn.Module):
     """Trivial, single parameter model."""
