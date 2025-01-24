@@ -48,10 +48,6 @@ class BasePolyModel(nn.Module):
         """Validate input tensor dimensions."""
         if input.dim() != 1:
             raise ValueError(f"Expected 1D input tensor, got {input.dim()}D")
-        if input.size(1) != self.in_features:
-            raise ValueError(
-                f"Expected input with {self.in_features} features, got {input.size(1)}"
-            )
 
 class PolyModel(BasePolyModel):
     """1D Polynomial model with configurable degrees."""
@@ -84,6 +80,7 @@ class PolyModel(BasePolyModel):
 
     def _compute_terms(self, w: Tensor) -> tuple[Tensor, Tensor]:
         """Compute polynomial terms."""
+        assert self.d1 >= 0 and self.d2 >= 0, "Degrees must be non-negative"
         w1 = (w + self.w0) ** self.d1
         w2 = (w - self.w0) ** self.d2
         return w1, w2
@@ -104,6 +101,7 @@ class PolyModel(BasePolyModel):
     @property
     def barrier_point(self) -> float:
         """Compute the barrier point between singular regions."""
+        assert self.w0 != 0, "w0 should not be 0"
         return (self.w0 * self.d1 - self.w0 * self.d2) / (self.d1 + self.d2)
 
 class PolyModel2D(BasePolyModel):
