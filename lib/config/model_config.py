@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 import torch
-
+from pathlib import Path
 @dataclass
 class BaseModelConfig:
     seed: int = 1
@@ -27,7 +27,7 @@ class PolyModel2DConfig(BaseModelConfig):
 
 @dataclass
 class TrainerConfig:
-    nSGD: int = 10**4
+    nSGD: int = 10**4 # Number of SGD trajectories
     nsamples: int = 10**3
     batch_size: int = 30
     lr: float = 0.01
@@ -35,3 +35,5 @@ class TrainerConfig:
     auto: bool = True
     seed: int = 1
     shuffle: bool = True
+    output_dir: Path = Path("../data/")
+    save_results: bool = True

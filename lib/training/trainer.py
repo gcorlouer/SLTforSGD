@@ -4,8 +4,9 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import copy
 import logging
-from typing import Tuple
+from typing import Tuple, Union
 from lib.config.model_config import TrainerConfig
+from lib.models.models import BasePolyModel, PolyModel, PolyModel2D
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class SGDTrainer:
             dataset, batch_size=self.config.batch_size, shuffle=self.config.shuffle, generator=g
         )
 
-    def train(self, model, dataset: DataLoader) -> Tuple[list, list]:
+    def train(self, model: Union[PolyModel, PolyModel2D] , dataset: DataLoader) -> Tuple[list, list]:
         """Train model with error handling and logging."""
         try:
             logger.info(f"Starting training with batch_size={self.config.batch_size}")
