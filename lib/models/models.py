@@ -3,8 +3,6 @@ import torch.nn as nn
 from torch import Tensor
 from typing import Optional
 from lib.config.model_config import PolyModel1DConfig, PolyModel2DConfig, BaseModelConfig
-# TODO: Test models classes and methods
-# TODO: Fix weights tensor vs float
 
 class TrivialModel(nn.Module):
     """Trivial, single parameter model."""
@@ -46,8 +44,8 @@ class BasePolyModel(nn.Module):
 
     def _validate_input(self, input: Tensor):
         """Validate input tensor dimensions."""
-        if input.dim() != 1:
-            raise ValueError(f"Expected 1D input tensor, got {input.dim()}D")
+        if input.shape[-1] != self.in_features:
+            raise ValueError(f"Expected {self.in_features} features, got {input.shape[-1]}")
 
 class PolyModel(BasePolyModel):
     """1D Polynomial model with configurable degrees."""

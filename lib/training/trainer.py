@@ -27,20 +27,24 @@ class SGDTrainer:
         if self.config.lr <= 0:
             raise ValueError(f"Learning rate must be positive, got {self.config.lr}")
 
-    def make_dataset(self, model: nn.Module) -> DataLoader:
+    def make_dataset(self, nfeatures: int= 1) -> DataLoader:
         """Create training dataset."""
         torch.manual_seed(self.config.seed)
         x_data = torch.randn(
-            (self.config.nsamples, model.out_features, model.in_features),
+            (self.config.nsamples, nfeatures),
             dtype=torch.float32,
         )
         y_data = torch.randn(
-            (self.config.nsamples, model.out_features, model.in_features),
+            (self.config.nsamples, nfeatures),
             dtype=torch.float32,
         )
         dataset = TensorDataset(x_data, y_data)
+
+        # Create a generator for DataLoader's shuffling
+        g = torch.Generator()
+        g.manual_seed(self.config.seed)
         return DataLoader(
-            dataset, batch_size=self.config.batch_size, shuffle=self.config.shuffle
+            dataset, batch_size=self.config.batch_size, shuffle=self.config.shuffle, generator=g
         )
 
     def train(self, model, dataset: DataLoader) -> Tuple[list, list]:
