@@ -7,7 +7,7 @@ class BaseModelConfig:
     seed: int = 1
     in_features: int = 1
     out_features: int = 1
-
+    dtype: torch.dtype = torch.float64
 @dataclass
 class PolyModel1DConfig(BaseModelConfig):
     w0: float = 2.0
@@ -27,6 +27,7 @@ class PolyModel2DConfig(BaseModelConfig):
 
 @dataclass
 class TrainerConfig:
+    dtype: torch.dtype = torch.float64
     nSGD: int = 10**4 # Number of SGD trajectories
     nsamples: int = 10**3
     batch_size: int = 30
@@ -35,5 +36,5 @@ class TrainerConfig:
     auto: bool = True
     seed: int = 1
     shuffle: bool = True
-    output_dir: Path = Path("../data/")
+    output_dir: Path = Path("../../data/")
     save_results: bool = True

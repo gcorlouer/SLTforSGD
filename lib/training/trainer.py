@@ -33,11 +33,11 @@ class SGDTrainer:
         torch.manual_seed(self.config.seed)
         x_data = torch.randn(
             (self.config.nsamples, nfeatures),
-            dtype=torch.float32,
+            dtype=self.config.dtype
         )
         y_data = torch.randn(
             (self.config.nsamples, nfeatures),
-            dtype=torch.float32,
+            dtype=self.config.dtype
         )
         dataset = TensorDataset(x_data, y_data)
 

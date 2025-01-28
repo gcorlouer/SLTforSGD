@@ -58,6 +58,7 @@ class PolyModel(BasePolyModel):
         self.wmin = cfg.wmin
         self.wmax = cfg.wmax
         self.w_init = cfg.w_init
+        self.dtype = cfg.dtype
         self.weight = self._initialize_weights()
 
     def _initialize_weights(self) -> nn.Parameter:
@@ -115,6 +116,7 @@ class PolyModel2D(BasePolyModel):
         self.wym = cfg.wym
         self.wx_init = cfg.wx_init
         self.wy_init = cfg.wy_init
+        self.dtype = cfg.dtype
         self.weights = self._initialize_weights()
 
     def _initialize_weights(self) -> tuple[nn.Parameter, nn.Parameter]:

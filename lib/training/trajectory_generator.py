@@ -47,8 +47,8 @@ class TrajectoryGenerator:
             np.random.uniform(
                 self.model_config.wmin,
                 self.model_config.wmax,
-                size=(self.model_config.out_features, self.model_config.in_features, self.trainer_config.n_trajectories)
-            )
+                size=(self.model_config.out_features, self.model_config.in_features, self.trainer_config.nSGD)
+            ),
         )
     
     def _get_filename(self) -> Path:
@@ -63,7 +63,7 @@ class TrajectoryGenerator:
     def generate(self, model: PolyModel) -> pd.DataFrame:
         """Generate trajectories for the model."""
         dataset = self.trainer.make_dataset(nfeatures=1)
-        w_inits = self._generate_initial_weights(model)
+        w_inits = self._generate_initial_weights()
         trajectory_data = TrajectoryData()
         
         for i in range(self.trainer_config.nSGD):
@@ -74,11 +74,11 @@ class TrajectoryGenerator:
             wi = w_inits[:, :, i]
             model.update_params(w_init=wi)
             model.update_params(weight=torch.nn.Parameter(model.w_init))
-            
+
             # Train and collect results
             running_loss, running_weight = self.trainer.train(model, dataset)
             trajectory_data.add_trajectory(
-                w_init=model.w_init.item(),
+                w_init=wi.item(),
                 trajectory=running_weight,
                 loss=running_loss
             )
@@ -118,7 +118,7 @@ class ParameterSweeper:
         trajectories = np.asarray(df["trajectory"].to_list())
         return trajectories[~np.isnan(trajectories).any(axis=1)]
 
-    def _regular_fraction(trajectories: np.array, model_config: PolyModel1DConfig) -> np.array:
+    def _regular_fraction(self, trajectories: np.array, model_config: PolyModel1DConfig) -> np.array:
         """Compute the fraction of trajectories in the regular phase."""
         # Comput local maximum
         wbarrier = (model_config.w0 * model_config.d1 - model_config.w0 * model_config.d2) / (model_config.d1 + model_config.d2)
@@ -127,59 +127,80 @@ class ParameterSweeper:
         phases[trajectories - wbarrier > 0] = 1
         phases[trajectories - wbarrier < 0] = -1
         # Plot fraction of trajectories escaping from regular to singular phase
-        return np.sum(phases == -1, axis=0) / phases.shape[0]
+        return np.sum(phases == -1, axis=0) / phases.shape[0] + 1e-8
 
     def _compute_escape_rate(
-        fraction, tmin=3, frac_max=10**-3, batch_size=20, lr=0.01, w0=1.5
-    ):
+        self,
+        fraction: np.array,
+        tmin: int = 3,
+        frac_max: float = 10**-3,
+    ) -> tuple[np.array, float]:
         """Compute the escape rate from the fraction of trajectories in the non-degenerate minimum."""
+        # Find where fraction drops below frac_max
         tmax = np.argmax(fraction < frac_max)
         if tmax == 0:
+            # If no values are below frac_max, use the entire array
             tmax = len(fraction)
+        
+        # Ensure we have enough points for regression
+        if tmax <= tmin:
+            # Return default values if we don't have enough points
+            return 0.0, 0.0
+            
         time = np.arange(0, len(fraction))
         regress_time = np.arange(tmin, tmax, 1)
-        log_frac = np.log(fraction)
-        regress_log_frac = np.log(fraction[tmin:tmax])  # Drop outliers for the regression
+        
+        # Ensure we have data to regress
+        if len(regress_time) == 0:
+            return 0.0, 0.0
+            
+        regress_log_frac = np.log(fraction[tmin:tmax])
         X_with_const = sm.add_constant(regress_time)
-        model = sm.OLS(regress_log_frac, X_with_const).fit()
-        escape_rate = np.abs(model.params[1])
-        error = model.bse[1]
-        predictions = model.get_prediction(X_with_const)
-        predictions_summary = predictions.summary_frame(
-            alpha=0.05
-        )  # 95% confidence interval
-        title_lines = [
-            f"Fraction of trajectories in the non-degenerate minimum",
-            rf"$B={batch_size}$, $\eta={lr}$, $w_0={w0:.2f}$",
-            # f"Escape rate is {escape_rate:.2e}"
-        ]
-        title = "\n".join(title_lines)
-        plt.figure()
-        plt.scatter(time, fraction, label="fraction", marker="x", color="orange")
-        plt.plot(
-            regress_time,
-            np.exp(predictions_summary["mean"]),
-            label="regression",
-            color="purple",
-        )
-        plt.fill_between(
-            regress_time,
-            np.exp(predictions_summary["obs_ci_lower"]),
-            np.exp(predictions_summary["obs_ci_upper"]),
-            alpha=0.5,
-            label="95% CI",
-        )
-        plt.xlabel("Time")
-        plt.ylabel("Fraction")
-        plt.yscale("log")
-        plt.ylim((10**-3, 1))
-        plt.legend()
-        plt.title(title)
-        fname = f"regression_B_{batch_size}_lr_{lr}_w0_{w0:.2e}.png"
-        fpath = Path("../data/")
-        fpath = fpath.joinpath(fname)
-        plt.savefig(fpath)
-        return escape_rate, error
+        
+        try:
+            model = sm.OLS(regress_log_frac, X_with_const).fit()
+            slope = model.params[1]
+            escape_rate = np.abs(slope) 
+            error = model.bse[1]
+            
+            # Generate predictions and plot
+            predictions = model.get_prediction(X_with_const)
+            predictions_summary = predictions.summary_frame(alpha=0.05)
+            title_lines = [
+                f"Fraction of trajectories in the non-degenerate minimum",
+                rf"$B={self.trainer_config.batch_size}$, $\eta={self.trainer_config.lr}$, $w_0={self.model_config.w0:.2f}$",
+                # f"Escape rate is {escape_rate:.2e}"
+            ]
+            title = "\n".join(title_lines)
+            plt.figure()
+            plt.scatter(time, fraction, label="fraction", marker="x", color="orange")
+            plt.plot(
+                regress_time,
+                np.exp(predictions_summary["mean"]),
+                label="regression",
+                color="purple",
+            )
+            plt.fill_between(
+                regress_time,
+                np.exp(predictions_summary["obs_ci_lower"]),
+                np.exp(predictions_summary["obs_ci_upper"]),
+                alpha=0.5,
+                label="95% CI",
+            )
+            plt.xlabel("Time")
+            plt.ylabel("Fraction")
+            plt.yscale("log")
+            plt.ylim((10**-3, 1))
+            plt.legend()
+            plt.title(title)
+            fname = f"regression_B_{self.trainer_config.batch_size}_lr_{self.trainer_config.lr}_w0_{self.model_config.w0:.2e}.png"
+            fpath = self.trainer_config.output_dir.joinpath(fname)
+            plt.savefig(fpath)
+            return escape_rate, error
+        
+        except Exception as e:
+            print(f"Regression failed: {e}")
+            return 0.0, 0.0
 
 
     def _compute_and_store_results(
@@ -195,9 +216,6 @@ class ParameterSweeper:
             fraction,
             frac_max=params['frac_max'],
             tmin=params['tmin'],
-            batch_size=params['batch_size'],
-            lr=params['lr'],
-            w0=params['w0']
         )
         
         # Store results
@@ -213,7 +231,7 @@ class ParameterSweeper:
         fname = (f"escape_rate_to_{frac_max}_trajectories_"
                 f"nSGD_{self.trainer_config.nSGD}_"
                 f"nsamples_{self.trainer_config.nsamples}.csv")
-        fpath = Path("../data/").joinpath(fname)
+        fpath = self.trainer_config.output_dir.joinpath(fname)
         df.to_csv(fpath)
 
     def parameter_sweep(
@@ -251,12 +269,12 @@ class ParameterSweeper:
             
             # Update parameters
             model.update_params(w0=w0)
-            self.trainer_config.update_params(batch_size=int(batch_size))
-            self.trainer_config.update_params(lr=lr)
+            self.trainer_config.batch_size = int(batch_size)
+            self.trainer_config.lr = lr
             
             # Generate and process trajectories
             df = self.trajectory_generator.generate(model)
-            clean_traj = self._process_trajectories(df, model)
+            clean_traj = self._process_trajectories(df)
             
             # Compute and store results
             params = {
