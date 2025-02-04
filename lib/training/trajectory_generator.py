@@ -94,11 +94,11 @@ class TrajectoryGenerator:
         """Save results to file."""
         output_path = self._get_filename()
         if not output_path.parent.exists():
-            raise FileNotFoundError(f"Output directory '{output_path.parent}' does not exist")
+            raise FileNotFoundError(f"Output directory '{output_path.parent}' does not exist, current path is {Path.cwd()}")
         df.to_csv(output_path)
 
 class ParameterSweeper:
-    """Sweeps over parameters and generates trajectories."""
+    """Sweeps over parameters and generates clean trajectories."""
     def __init__(self, model_config: PolyModel1DConfig, trainer_config: TrainerConfig):
         self.model_config = model_config
         self.trainer_config = trainer_config
@@ -153,7 +153,7 @@ class ParameterSweeper:
         # Ensure we have data to regress
         if len(regress_time) == 0:
             return 0.0, 0.0
-            
+
         regress_log_frac = np.log(fraction[tmin:tmax])
         X_with_const = sm.add_constant(regress_time)
         

@@ -44,7 +44,7 @@ def theoretical_loss(model: PolyModel, w, x, y):
     """
     Compute theoretical as the empirical loss at parameter w over all data samples x and y
     """
-    loss_function = nn.MSELoss()
+    loss_function = torch.nn.MSELoss()
     model.update_params(weight=torch.nn.Parameter(torch.tensor(w)))
     y_pred = model.forward(x)
     return loss_function(y_pred, y).item()

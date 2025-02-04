@@ -10,7 +10,7 @@ class BaseModelConfig:
     dtype: torch.dtype = torch.float64
 @dataclass
 class PolyModel1DConfig(BaseModelConfig):
-    w0: float = 2.0
+    w0: float = 1.8
     wmin: float = -4.0
     wmax: float = 4.0
     d1: int = 1
