@@ -6,9 +6,9 @@ import torch
 import ast
 import os
 import sys
-import pymc as pm
 import pandas as pd
-
+import matplotlib
+matplotlib.use('TkAgg')  # or 'Qt5Agg'
 from pathlib import Path
 
 from lib.models.models import PolyModel
@@ -48,8 +48,8 @@ plt.rcParams.update(params)
 #%%
 
 model_cfg = PolyModel1DConfig()
-nSGD = 10**2
-nsamples = 10**2
+nSGD = 10**3
+nsamples = 10**3
 trainer_cfg = TrainerConfig(nSGD=nSGD, nsamples=nsamples, output_dir=Path("../data/"))
 
 frac_max = 10**-3
@@ -61,11 +61,11 @@ trajectory_generator = TrajectoryGenerator(model_config=model_cfg, trainer_confi
 parameter_sweeper = ParameterSweeper(model_config=model_cfg, trainer_config=trainer_cfg)
 
 #%% Compute and plot escape rate
-%matplotlib inline
 df = trajectory_generator.generate(model)
 clean_trajectories = parameter_sweeper._process_trajectories(df)
 regular_fraction = parameter_sweeper._regular_fraction(clean_trajectories, model_cfg)
 escape_rate = parameter_sweeper._compute_escape_rate(fraction=regular_fraction, frac_max=frac_max, tmin=3)
+plt.show()
 #%% Plot potential
 plot_potential(model, nsamp=10**4, ymax=500)
 
@@ -80,6 +80,7 @@ plt.xlabel("End of trajectory")
 plt.ylabel("Density")
 plt.xlim((-model_cfg.wmax, model_cfg.wmax))
 plt.title(f"Distribution of SGD trajectories after {niterations} iterations")
+plt.show()
 # %% Bayesian posterior
 # Exact
 n_values = [1, 100, 1000]

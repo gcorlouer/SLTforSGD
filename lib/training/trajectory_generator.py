@@ -58,7 +58,7 @@ class TrajectoryGenerator:
                      f"_seed_{self.trainer_config.seed}_N_{self.trainer_config.nSGD}"
                      f"_m_{self.trainer_config.nsamples}")
         fname = f"sgd_traj_{sgd_params}_{model_params}.csv"
-        return self.trainer_config.output_dir.joinpath(fname)
+        return fname
 
     def generate(self, model: PolyModel) -> pd.DataFrame:
         """Generate trajectories for the model."""
@@ -93,6 +93,7 @@ class TrajectoryGenerator:
     def _save_results(self, df: pd.DataFrame, model: PolyModel):
         """Save results to file."""
         output_path = self._get_filename()
+        output_path = Path(__file__).parent.parent.parent.joinpath(output_path)
         if not output_path.parent.exists():
             raise FileNotFoundError(f"Output directory '{output_path.parent}' does not exist, current path is {Path.cwd()}")
         df.to_csv(output_path)

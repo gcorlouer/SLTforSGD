@@ -18,8 +18,8 @@ The file `SGD_utils` contains code from a previous, much less modular, version.
 
 Install dependencies with `pip install -r requirement.txt` and run experiments in notebooks.
 
-Install package with `pip -install e.`
+Install package with `pip install -e .`
 
-To see examples of SGD escaping in 1D and comparison with the Bayes posterior running the codebase, see `notebooks/sgd1d.py` and other notebooks.
+To see examples of SGD escaping in 1D and comparison with the Bayes posterior running the codebase, see `notebooks/sgd1d.py`.
 
 
